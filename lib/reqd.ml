@@ -276,6 +276,19 @@ let respond_with_streaming t ?(flush_headers_immediately = false) response =
       "h2.Reqd.respond_with_streaming: invalid state, currently handling error";
   unsafe_respond_with_streaming ~flush_headers_immediately t response
 
+let send_trailer_headers t headers =
+  match t.state with
+  | Active (HalfClosed _, stream) ->
+    let frame_info =
+      Writer.make_frame_info
+        ~max_frame_size:t.max_frame_size
+        ~flags:(Flags.default_flags |> Flags.set_end_stream)
+        t.id in
+    Writer.write_trailer_headers t.writer stream.encoder frame_info headers;
+    Stream.finish_stream t Finished
+  | _ ->
+    assert false
+
 let start_push_stream t s request =
   match s.create_push_stream () with
   | Ok promised_reqd ->
